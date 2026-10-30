@@ -1,59 +1,65 @@
 # Apple Podcasts Bulk Unfollow
 
-[中文说明](README.md) · [Code review](docs/CODE_REVIEW.md) · [MIT License](LICENSE)
+[中文说明](README.md) · [Code review](docs/CODE_REVIEW.md) · [Usage evidence](docs/VALIDATION.md) · [MIT License](LICENSE)
 
-An experimental AppleScript that sends bounded Unfollow requests to Apple Podcasts using macOS accessibility UI scripting. The distribution version defaults to **one request**, asks for confirmation, and never automatically presses a download-removal button.
+**This is the GPT-assisted fast unfollow script that the user confirms they successfully ran on their own Mac.** The published `unfollow_all_podcasts.applescript` is byte-for-byte identical to the supplied working file. Its behavior has not been rewritten for publication.
 
-**The distribution version has not been tested by unfollowing real shows.** Compilation and static review do not demonstrate runtime compatibility. It expects exact English accessibility labels `Shows` and `Unfollow` and a particular show-grid structure.
+An earlier packaging mistake put a separate guarded rewrite at the main entry point. That mistake has been corrected: the current repository contains only the user-tested fast script, with documentation matching its actual behavior.
 
-## Before running
+## Read before running
 
-- Record show names or links yourself. There is no backup, undo, or automated restore. Changes may sync through Apple's library sync to other devices.
-- Podcasts may ask whether to keep or remove downloaded episodes. This version stops on recognized dialogs and leaves every dialog button for you to choose manually. The last Unfollow request may already have taken effect when the script stops.
-- Unfollowing does not cancel a paid subscription. See [Apple's Mac guide](https://support.apple.com/en-mt/guide/podcasts/podf17151dc/mac), which also describes the download-removal choice.
-- Keep watching the app. UI automation remains fallible; the guards do not guarantee preservation of content.
+**Running starts real operations immediately, without a startup confirmation, for up to 500 iterations. The script also automatically confirms library removal, which can delete downloaded episodes.** These behaviors are preserved from the working fast script.
 
-## Setup
+- After Unfollow, it inspects a Podcasts sheet and presses a button whose name contains `Remove`. This is not a preserve-downloads tool and has no preview mode.
+- Record show names or links and back up downloads you need. There is no automated undo or restore; library changes may sync to other devices.
+- Unfollowing does not cancel a paid subscription. See [Apple's Mac guide](https://support.apple.com/en-mt/guide/podcasts/podf17151dc/mac) for the distinction and download choices.
+- Successful use on one Mac does not establish compatibility with every OS, app version, language, or UI layout.
 
-1. Choose **Code → Download ZIP** on this repository and extract it, or clone the repository. No additional software dependencies are required.
-2. Read the source. Open Podcasts manually in **Library → Shows**, with followed shows selected if that filter is available. Close other Podcasts windows, its mini-player, and any dialogs; leave one main window.
-3. Use the English app interface. Other languages are unsupported. If needed, set English for Podcasts specifically in macOS Language & Region app settings, then reopen it.
-4. Grant accessibility permission to the actual runner, such as Terminal or Script Editor, in **System Settings → Privacy & Security → Accessibility**. If prompted, allow that runner to automate System Events / Podcasts. See [Apple's permission guide](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac). Labels may vary by OS version. Administrator commands, Full Disk Access, and disabling system protections are not required.
+## Existing speed improvements
 
-## Run one request first
+The code caches the show grid and parent references, prefers a shallow menu search, and polls briefly rather than paying fixed long delays. The uploaded file already omits the expensive full-window `Remove From Library` fallback. Sheet-level removal confirmation remains present. There is no reproducible benchmark or claimed speed multiplier.
 
-In Terminal, type `cd `, drag the extracted project folder into the window, and press Return. Then:
+## Setup and run
+
+1. Choose **Code → Download ZIP** and extract it, or clone the repository. No extra runtime package is needed.
+2. Read the source and risks. Open Apple Podcasts manually in **Library → Shows**, displaying followed shows in its grid. Close existing dialogs and keep the main window visible. The script does not navigate to this view for you.
+3. The code matches exact English accessibility labels `Shows` and `Unfollow`; other languages have not been adapted. If needed, set English specifically for Podcasts in macOS app language settings, then reopen it.
+4. Grant the actual runner, such as Terminal or Script Editor, the necessary accessibility and automation permissions. See [Apple's permission guide](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac). Setting names can vary with macOS.
+
+In Terminal, type `cd `, drag the extracted project folder into the window, and press Return. Only run the following once you accept the automatic unfollow and removal behavior:
 
 ```sh
 osascript ./unfollow_all_podcasts.applescript
 ```
 
-**This performs a real library-changing operation after you choose Continue. It is not a preview.** Cancel is the default button. Opening the distribution script in Script Editor and choosing Run also uses the one-request default.
+You can also open the source in Script Editor and choose Run. **Both methods start immediately, with a 500-iteration cap.** The script does not parse a batch-size CLI argument; adding `10` to the command does not change the limit.
 
-After manually checking that result, an optional integer argument sets a larger limit:
+To try a smaller batch, edit line 21, changing `set maxIterations to 500` to a smaller positive integer, and save. Your edited copy will then differ from the byte-preserved published file.
 
-```sh
-osascript ./unfollow_all_podcasts.applescript 10
+Watch Podcasts while it runs and do not change its view or interact with other windows. To stop further actions, use **Control-C** in its Terminal or Stop in Script Editor. Already-applied changes are not automatically reversed.
+
+## Results and limitations
+
+The script returns show descriptions and displays an `Unfollowed` count, but does not independently verify the final following state after each click. Inspect the library yourself. The iteration cap is not a guarantee that the entire account will be clear.
+
+For missing `Shows` or `Unfollow`, check English labels, the show grid, and following state. UI hierarchies can differ across versions. Check permissions if automation fails. Bring Podcasts onto the current desktop manually if Spaces causes trouble: the source's Dock-switching comments are stale; the implementation uses `activate` and sets the process frontmost.
+
+## Usage evidence
+
+- The user explicitly confirms successful real use of this GPT-optimized fast script.
+- The repository file matches the uploaded file and the user's Desktop copy by SHA-256.
+- AppleScript compilation passed during preparation. No cancellation script was re-executed during publication; this does not negate the user's earlier successful use.
+- A complete OS/app version and language record for that successful run was not separately captured. Source comments mention historical macOS 26 / Darwin 25.5.0, which does not identify the user's actual successful environment.
+- No cross-version compatibility matrix exists. This macOS AppleScript cannot run on iOS, iPadOS, Windows, or the web app.
+
+The script has 292 lines and 9,440 bytes. SHA-256:
+
+```text
+d42c4321f64aeb62b6f23ea926ce3bf7b301e7039e171c226fdbb7d1c04963ea
 ```
 
-Only integers `1` through `500` are accepted; confirmation is required on every run. The limit is a cap on requests, not a promise to unfollow every show.
+## License and feedback
 
-Do not interact with or navigate Podcasts while it runs. To stop, press **Control-C** in its Terminal or Stop in Script Editor. Already-sent requests cannot be recalled. Inspect and handle any menu or dialog left open after stopping.
+MIT licensed. The user states that GPT helped modify this script and explicitly authorized public sharing. The file has no upstream attribution, prior license, or upstream URL; unknown third-party rights have not been independently cleared. See [the provenance record](docs/CODE_REVIEW.md#来源与许可). This project is unaffiliated with Apple.
 
-## Output and limitations
-
-The script reports **requests sent**, not verified successful unfollows. It logs show labels locally to Terminal, so review logs before sharing them.
-
-It stops on missing English labels, recognized sheets/dialogs, lost focus, unexpected window counts, inaccessible UI elements, duplicate processed labels, exhausted search budgets, or failure of the first tile to change. A changing tile is only a UI observation. Empty views are not evidence that the entire account is clear. Unfollowed shows may remain in an unfiltered library, in which case a followed-shows filter or manual intervention is needed.
-
-If a dialog appears, read it and decide manually whether to keep downloads. Inspect the show's state before restarting. Do not work around missing labels by matching `Remove` or pressing default dialog buttons.
-
-The original file's header claims historical testing on macOS 26 / Darwin 25.5.0; that claim was not independently reverified. The current preparation environment was macOS 27.2. Only compilation and static checks were performed. No real unfollows, download prompts, or cross-device synchronization were tested. iOS, iPadOS, Windows, and the web app cannot run this script.
-
-## Original source and license
-
-`original/unfollow_all_podcasts.applescript.txt` preserves the user-supplied original byte for byte. It defaults to **500** iterations and automatically presses a button whose name contains `Remove`; this can remove library/downloaded content. It is reference material, not the recommended entry point. The `.txt` extension is a label, not a sandbox: an interpreter can still explicitly run it.
-
-See [the code review](docs/CODE_REVIEW.md), [validation record](docs/VALIDATION.md), and [changelog](CHANGELOG.md). MIT licensed; preserve the license when redistributing. The supplied script was AI-assisted, contains no upstream attribution or prior license, and its upstream provenance has not been independently established. The license grants rights the contributor can grant. This project is unaffiliated with Apple.
-
-For bug reports, include macOS version, Podcasts version, app language, and error text. Omit account details and private show lists. Distinguish compile-only checks, synthetic checks, and real-account testing.
+Bug reports should include macOS/Podcasts versions, interface language, and error text. Omit private show lists and account details.

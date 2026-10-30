@@ -1,192 +1,292 @@
--- Apple Podcasts Bulk Unfollow — guarded, experimental distribution version.
--- MIT License. Copyright (c) 2026 likeo0o.
--- Read README.md before running. This changes your Podcasts library.
--- English UI only: exact accessibility labels "Shows" and "Unfollow".
--- Default: at most ONE request; optional CLI argument: integer 1..500.
--- Never confirms download-removal dialogs. Stops on dialogs or UI mismatch.
--- Compiling this source does not run it. Runtime has NOT been release-tested.
+-- Unfollow all shows in Podcasts.app
+--
+-- Verified against the live UI (macOS 26 / Darwin 25.5.0) using System Events
+-- accessibility scripting. Podcasts.app exposes almost no standard container
+-- roles (no scroll area/table/outline) -- everything is nested AXGroups, so
+-- this walks the tree manually via `UI elements of X` rather than relying on
+-- System Events' recursive `every <class> of <container>` (which does not
+-- reliably descend through this app's structure).
+--
+-- HOW TO RUN: osascript unfollow_all_podcasts.applescript
+-- Podcasts must already be running. You don't need to have it frontmost
+-- first -- the script switches to its Space itself via the Dock icon, since
+-- `tell application "Podcasts" to activate` alone does not reliably switch
+-- macOS Spaces.
+--
+-- SAFETY: capped at maxIterations so a UI mismatch can't spin forever. Each
+-- iteration re-fetches the first followed-show tile fresh (rather than
+-- caching a list up front), since unfollowing a show removes it from the
+-- grid and shifts the rest.
 
-property searchNodes : 0
-property searchNodeLimit : 2500
-property searchDepthLimit : 20
-
-on run argv
-	set maxIterations to 1
-	if (count of argv) > 1 then error "Usage: osascript unfollow_all_podcasts.applescript [1..500]"
-	if (count of argv) = 1 then
-		set rawLimit to item 1 of argv
-		try
-			set maxIterations to rawLimit as integer
-		on error
-			error "The limit must be a whole number from 1 to 500."
-		end try
-		if (maxIterations as text) is not rawLimit or maxIterations < 1 or maxIterations > 500 then error "The limit must be a whole number from 1 to 500."
-	end if
-
-	try
-		display dialog "Send up to " & maxIterations & " Unfollow request(s) in Apple Podcasts?" & return & return & "Prepare Library > Shows with followed shows first, using the English app interface. Stay with the app while it runs." & return & return & "This changes your library and may sync to other devices. Save a list of shows first. Any download-removal dialog stops the script for you to handle manually." buttons {"Cancel", "Continue"} default button "Cancel" cancel button "Cancel" with title "Apple Podcasts Bulk Unfollow" with icon caution
-	on error number -128
-		return "Cancelled; no requests sent."
-	end try
-
-	set requestCount to 0
-	set requestedNames to {}
-	set stopReason to "Reached the requested limit. Check the library to confirm the result."
-	try
-		tell application "System Events"
-			if not (exists process "Podcasts") then error "Open Podcasts and its Library > Shows view first."
-		end tell
-		tell application "Podcasts" to activate
-		delay 0.5
-		tell application "System Events" to tell process "Podcasts" to set frontmost to true
-
-		repeat with i from 1 to maxIterations
-			my assertReady()
-			set firstShow to my currentFirstShow()
-			if firstShow is missing value then
-				set stopReason to "No show tile was found in the current view. This does not prove all shows were unfollowed."
-				exit repeat
-			end if
-			set showName to my tileLabel(firstShow)
-			if showName is "" then error "The first show has no readable label; refusing to guess."
-			if requestedNames contains showName then error "A previously processed label is still first (or duplicated). Refusing to repeat the action."
-
-			my assertReady()
-			tell application "System Events" to perform action "AXShowMenu" of firstShow
-			set theMenu to missing value
-			repeat with attempt from 1 to 10
-				my assertReady()
-				set theMenu to my currentMenu()
-				if theMenu is not missing value then exit repeat
-				delay 0.2
-			end repeat
-			if theMenu is missing value then error "The show context menu did not open."
-
-			set unfollowItem to missing value
-			tell application "System Events"
-				repeat with mItem in (menu items of theMenu)
-					if (name of mItem) is "Unfollow" then
-						if unfollowItem is not missing value then error "Multiple Unfollow items found."
-						set unfollowItem to mItem
-					end if
-				end repeat
-				if unfollowItem is missing value then error "No exact English Unfollow item. Check the language and followed-shows view."
-				if not (enabled of unfollowItem) then error "Unfollow is disabled."
-			end tell
-			my assertReady()
-			-- This is the only press action in this distribution version.
-			tell application "System Events" to perform action "AXPress" of unfollowItem
-			set requestCount to requestCount + 1
-			set end of requestedNames to showName
-			log ("Unfollow request sent for: " & showName)
-
-			-- Wait for a changed first tile, without clicking any dialog buttons.
-			-- Require two matching observations; a UI change is not server proof.
-			set changedView to false
-			set previousLabel to missing value
-			repeat with attempt from 1 to 30
-				delay 0.2
-				my assertReady()
-				set nextShow to my currentFirstShow()
-				set nextLabel to ""
-				if nextShow is not missing value then set nextLabel to my tileLabel(nextShow)
-				if nextLabel is not showName and nextLabel is previousLabel then
-					set changedView to true
-					exit repeat
-				end if
-				set previousLabel to nextLabel
-			end repeat
-			if not changedView then error "The first tile did not change within the wait period. Inspect Podcasts before retrying."
-		end repeat
-	on error errMsg number errNum
-		-- Do not send Escape, Return, or any other key into an unknown dialog.
-		set stopReason to "Stopped (" & errNum & "): " & errMsg & " The last request may already have taken effect. Inspect Podcasts before restarting."
-	end try
-	set summaryText to "Unfollow requests sent: " & requestCount & ". " & stopReason
-	log summaryText
-	return summaryText
-end run
+set maxIterations to 500
+set unfollowedCount to 0
+set unfollowedNames to {}
 
 using terms from application "System Events"
-	on assertReady()
-		tell application "System Events"
-			if not (exists process "Podcasts") then error "Podcasts is no longer running."
-			tell process "Podcasts"
-				if not frontmost then error "Podcasts lost focus."
-				if (count of windows) is not 1 then error "Expected exactly one Podcasts window. Close extra windows or dialogs."
-				set w to window 1
-				if (count of sheets of w) > 0 then error "A Podcasts sheet is open. Handle it manually; no button was pressed by this script."
-				if (subrole of w) is "AXDialog" then error "A Podcasts dialog is open. Handle it manually."
-			end tell
-		end tell
-	end assertReady
-
-	on currentFirstShow()
-		set searchNodes to 0
-		tell application "System Events" to tell process "Podcasts" to set w to window 1
-		set showsGroup to my findMatch(w, "AXGroup", "Shows", 0)
-		if showsGroup is missing value then error "No exact English Shows group. Open Library > Shows. This app version or language may be unsupported."
-		tell application "System Events"
-			repeat with k in (UI elements of showsGroup)
-				if (role of k) is "AXButton" then return contents of k
-			end repeat
-		end tell
-		return missing value
-	end currentFirstShow
-
-	on tileLabel(theTile)
-		tell application "System Events"
-			set labelText to description of theTile
-			if labelText is missing value then return ""
-			return labelText as text
-		end tell
-	end tileLabel
-
-	on currentMenu()
-		tell application "System Events" to tell process "Podcasts" to set w to window 1
-		-- Keep the original shallow menu lookup, refreshing its parent each time.
-		tell application "System Events"
-			set topChildren to UI elements of w
-			if (count of topChildren) > 0 then
-				repeat with k in (UI elements of item 1 of topChildren)
-					if (role of k) is "AXMenu" then return contents of k
-				end repeat
-			end if
-		end tell
-		set searchNodes to 0
-		return my findMatch(w, "AXMenu", missing value, 0)
-	end currentMenu
-
-	on findMatch(e, roleWanted, descWanted, depth)
-		set searchNodes to searchNodes + 1
-		if searchNodes > searchNodeLimit then error "Accessibility search budget exceeded; stopping."
-		set roleText to ""
-		set descText to ""
-		tell application "System Events"
-			try
-				set roleText to role of e
-			end try
-			if descWanted is not missing value then
-				try
-					set descText to description of e
-				end try
-			end if
-		end tell
-		if roleText is roleWanted then
-			if descWanted is missing value then return e
-			if descText is descWanted then return e
+	on findFirstMatch(e, roleWanted, descWanted, depth, maxDepth)
+		if e is missing value then return missing value
+		set roleStr to ""
+		try
+			set roleStr to role of e
+		end try
+		set descStr to ""
+		try
+			set descStr to description of e
+		end try
+		if roleStr is roleWanted and descStr is descWanted then
+			return e
 		end if
-		if depth >= searchDepthLimit then return missing value
-		set childrenList to {}
-		tell application "System Events"
+		if depth < maxDepth then
 			try
-				set childrenList to UI elements of e
+				set kidList to UI elements of e
+				repeat with k in kidList
+					set found to my findFirstMatch(k, roleWanted, descWanted, depth + 1, maxDepth)
+					if found is not missing value then
+						return found
+					end if
+				end repeat
 			end try
-		end tell
-		repeat with k in childrenList
-			set found to my findMatch(contents of k, roleWanted, descWanted, depth + 1)
-			if found is not missing value then return found
-		end repeat
+		end if
 		return missing value
-	end findMatch
+	end findFirstMatch
+
+	on findFirstMatchByRole(e, roleWanted, depth, maxDepth)
+		if e is missing value then return missing value
+		set roleStr to ""
+		try
+			set roleStr to role of e
+		end try
+		if roleStr is roleWanted then
+			return e
+		end if
+		if depth < maxDepth then
+			try
+				set kidList to UI elements of e
+				repeat with k in kidList
+					set found to my findFirstMatchByRole(k, roleWanted, depth + 1, maxDepth)
+					if found is not missing value then
+						return found
+					end if
+				end repeat
+			end try
+		end if
+		return missing value
+	end findFirstMatchByRole
+
+	on findButtonContainingName(e, nameSubstr, depth, maxDepth)
+		if e is missing value then return missing value
+		set roleStr to ""
+		try
+			set roleStr to role of e
+		end try
+		if roleStr is "AXButton" then
+			set nm to ""
+			try
+				set nm to name of e
+			end try
+			if nm contains nameSubstr then return e
+		end if
+		if depth < maxDepth then
+			try
+				set kidList to UI elements of e
+				repeat with k in kidList
+					set found to my findButtonContainingName(k, nameSubstr, depth + 1, maxDepth)
+					if found is not missing value then
+						return found
+					end if
+				end repeat
+			end try
+		end if
+		return missing value
+	end findButtonContainingName
 end using terms from
+
+tell application "System Events"
+	if not (exists process "Podcasts") then
+		display dialog "Podcasts isn't running. Open it first." buttons {"OK"} default button 1
+		return
+	end if
+
+	-- Switch to whatever Space Podcasts' window lives on. `activate` alone
+	-- does not reliably do this; clicking the Dock icon does.
+        tell application "Podcasts" to activate
+	delay 0.3
+
+	tell process "Podcasts"
+		set frontmost to true
+		set w to window 1
+
+		-- Resolve these once, up front: the deep recursive searches are the
+		-- real cost, not the small `delay`s. showsGroup and mainGroup are
+		-- stable AXUIElement references that stay valid as show tiles come
+		-- and go underneath them, so there's no need to re-search the whole
+		-- window tree on every single iteration -- only refresh them (via
+		-- the try/on error fallback below) if a reference ever goes stale.
+		set showsGroup to my findFirstMatch(w, "AXGroup", "Shows", 0, 20)
+		if showsGroup is missing value then
+			display dialog "Stopped: couldn't find the Shows grid." buttons {"OK"} default button 1
+			return
+		end if
+		-- The open context menu always shows up as a shallow sibling of the
+		-- big content subtree (2 levels under the window), so instead of a
+		-- full recursive search for it each time (which would have to walk
+		-- the entire show grid first), just check the direct children of
+		-- this top-level group.
+		set mainGroup to item 1 of (UI elements of w)
+
+		repeat with i from 1 to maxIterations
+			try
+				set kids to UI elements of showsGroup
+			on error
+				set showsGroup to my findFirstMatch(w, "AXGroup", "Shows", 0, 20)
+				if showsGroup is missing value then
+					display dialog "Stopped after unfollowing " & unfollowedCount & " show(s): couldn't find the Shows grid." buttons {"OK"} default button 1
+					exit repeat
+				end if
+				set kids to UI elements of showsGroup
+			end try
+			set firstShow to missing value
+			repeat with k in kids
+				set r to ""
+				try
+					set r to role of k
+				end try
+				if r is "AXButton" then
+					set firstShow to k
+					exit repeat
+				end if
+			end repeat
+
+			if firstShow is missing value then
+				-- Grid may be mid-reflow right after a previous unfollow;
+				-- retry briefly before concluding we're actually done. Check
+				-- immediately first, then only pay small delays between
+				-- retries -- for as long as it takes to settle, not a fixed
+				-- wait every time.
+				set retryFound to false
+				repeat with attempt from 1 to 6
+					set kids to UI elements of showsGroup
+					repeat with k in kids
+						set r to ""
+						try
+							set r to role of k
+						end try
+						if r is "AXButton" then
+							set firstShow to k
+							set retryFound to true
+							exit repeat
+						end if
+					end repeat
+					if retryFound then exit repeat
+					if attempt < 6 then delay 0.05
+				end repeat
+				if not retryFound then exit repeat -- no more followed shows
+			end if
+
+			set showName to ""
+			try
+				set showName to description of firstShow
+			end try
+
+			try
+				-- The app can still be mid-animation from the previous
+				-- removal, and AXShowMenu fired into that seems to get
+				-- silently dropped rather than queued -- waiting longer
+				-- doesn't help, but re-firing the action does. So retry the
+				-- action itself, polling cheaply (shallow children of
+				-- mainGroup, not a full tree walk) in between. Exits the
+				-- moment the menu shows up; only pays the ~2s budget on the
+				-- rare attempt that's genuinely slow.
+				set theMenu to missing value
+				repeat with attempt from 1 to 14
+					perform action "AXShowMenu" of firstShow
+					delay 0.1
+					try
+						repeat with k in (UI elements of mainGroup)
+							set r to ""
+							try
+								set r to role of k
+							end try
+							if r is "AXMenu" then
+								set theMenu to k
+								exit repeat
+							end if
+						end repeat
+					end try
+					if theMenu is not missing value then exit repeat
+				end repeat
+				if theMenu is missing value then
+					-- Last resort: the expensive full-tree search, in case
+					-- the menu isn't where we expect it to be.
+					set theMenu to my findFirstMatchByRole(w, "AXMenu", 0, 20)
+				end if
+				if theMenu is missing value then error "context menu did not open"
+
+				set unfollowItem to missing value
+				set mi to menu items of theMenu
+				repeat with mItem in mi
+					set inm to ""
+					try
+						set inm to name of mItem
+					end try
+					if inm is "Unfollow" then
+						set unfollowItem to mItem
+						exit repeat
+					end if
+				end repeat
+
+				if unfollowItem is missing value then error "no \"Unfollow\" item in menu"
+
+				perform action "AXPress" of unfollowItem
+
+				-- Some shows prompt to remove/keep downloaded episodes
+				-- ("Remove all episodes of ... from your Library?" with
+				-- buttons "Remove From Library" / "Keep All Episodes").
+				-- Auto-confirm removal, per explicit user choice. This
+				-- dialog is rare (only shows with actual downloads trigger
+				-- it) and its appearance isn't instant, so check right away
+				-- with no delay, then only pay small delays between retries
+				-- -- and only for as long as it takes to show up, not a
+				-- fixed wait every single time.
+				set removeBtn to missing value
+				repeat with attempt from 1 to 5
+					try
+						set sheetCount to count of sheets of w
+						if sheetCount > 0 then
+							set theSheet to sheet 1 of w
+							set sheetBtns to buttons of theSheet
+							repeat with aBtn in sheetBtns
+								set bn to ""
+								try
+									set bn to name of aBtn
+								end try
+								if bn contains "Remove" then
+									set removeBtn to aBtn
+									exit repeat
+								end if
+							end repeat
+						end if
+					end try
+
+					if removeBtn is not missing value then exit repeat
+					if attempt < 5 then delay 0.06
+				end repeat
+				if removeBtn is not missing value then
+					perform action "AXPress" of removeBtn
+				end if
+
+				set unfollowedCount to unfollowedCount + 1
+				set end of unfollowedNames to showName
+			on error errMsg
+				try
+					key code 53 -- Escape, in case a menu got left open
+				end try
+				display dialog "Stopped after unfollowing " & unfollowedCount & " show(s). Error on \"" & showName & "\": " & errMsg buttons {"OK"} default button 1
+				exit repeat
+			end try
+		end repeat
+	end tell
+end tell
+
+display notification ("Unfollowed " & unfollowedCount & " show(s).") with title "Podcasts Cleanup"
+return unfollowedNames
