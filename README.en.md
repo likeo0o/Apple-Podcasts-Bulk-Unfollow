@@ -2,7 +2,7 @@
 
 [中文说明](README.md) · [Code review](docs/CODE_REVIEW.md) · [Usage evidence](docs/VALIDATION.md) · [MIT License](LICENSE)
 
-**This is the GPT-assisted fast unfollow script that the user confirms they successfully ran on their own Mac.** The published `unfollow_all_podcasts.applescript` is byte-for-byte identical to the supplied working file. Its behavior has not been rewritten for publication.
+**This is the fast unfollow script that the user confirms they successfully ran on their own Mac.** The published `unfollow_all_podcasts.applescript` is byte-for-byte identical to the supplied working file. Its behavior has not been rewritten for publication.
 
 An earlier packaging mistake put a separate guarded rewrite at the main entry point. That mistake has been corrected: the current repository contains only the user-tested fast script, with documentation matching its actual behavior.
 
@@ -46,7 +46,7 @@ For missing `Shows` or `Unfollow`, check English labels, the show grid, and foll
 
 ## Usage evidence
 
-- The user explicitly confirms successful real use of this GPT-optimized fast script.
+- The user explicitly confirms successful real use of this fast script.
 - The repository file matches the uploaded file and the user's Desktop copy by SHA-256.
 - AppleScript compilation passed during preparation. No cancellation script was re-executed during publication; this does not negate the user's earlier successful use.
 - A complete OS/app version and language record for that successful run was not separately captured. Source comments mention historical macOS 26 / Darwin 25.5.0, which does not identify the user's actual successful environment.
@@ -60,6 +60,6 @@ d42c4321f64aeb62b6f23ea926ce3bf7b301e7039e171c226fdbb7d1c04963ea
 
 ## License and feedback
 
-MIT licensed. The user states that GPT helped modify this script and explicitly authorized public sharing. The file has no upstream attribution, prior license, or upstream URL; unknown third-party rights have not been independently cleared. See [the provenance record](docs/CODE_REVIEW.md#来源与许可). This project is unaffiliated with Apple.
+MIT licensed. The user supplied this working script and explicitly authorized public sharing. The file has no upstream attribution, prior license, or upstream URL; unknown third-party rights have not been independently cleared. See [the provenance record](docs/CODE_REVIEW.md#来源与许可). This project is unaffiliated with Apple.
 
 Bug reports should include macOS/Podcasts versions, interface language, and error text. Omit private show lists and account details.

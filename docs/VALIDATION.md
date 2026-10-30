@@ -2,9 +2,9 @@
 
 ## 已有的真实成功使用
 
-**用户明确确认：自己成功运行使用的是经 GPT 修改优化后的快速取消关注脚本，也就是本次上传的 `unfollow_all_podcasts.applescript`。** 这是来自使用者的真实使用反馈，应当如实保留，不能因为发布整理时没有重新运行就写成“这份脚本未经实际使用”。
+**用户明确确认：自己成功运行使用的是这份快速取消关注脚本，也就是本次上传的 `unfollow_all_podcasts.applescript`。** 这是来自使用者的真实使用反馈，应当如实保留，不能因为发布整理时没有重新运行就写成“这份脚本未经实际使用”。
 
-The user explicitly confirms successful real use of the GPT-optimized fast script supplied for publication. This is user-reported runtime evidence; it is distinct from the maintainer's compile checks.
+The user explicitly confirms successful real use of the fast script supplied for publication. This is user-reported runtime evidence; it is distinct from the maintainer's compile checks.
 
 完整的成功运行环境（macOS 版本、Podcasts 版本、应用语言和视图配置）没有单独记录。源码中 macOS 26 / Darwin 25.5.0 的注释不是对用户成功运行环境的独立测量，也不能据此扩大跨版本兼容承诺。
 
