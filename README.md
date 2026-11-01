@@ -1,76 +1,38 @@
 # Apple Podcasts Bulk Unfollow
 
-[English instructions](README.en.md) · [代码审查](docs/CODE_REVIEW.md) · [使用与验证记录](docs/VALIDATION.md) · [MIT 许可证](LICENSE)
+Unfollow Apple Podcasts shows in bulk on macOS.
 
-**这是用户已在自己的 Mac 上实际成功使用的快速取消关注脚本。** 本仓库的 `unfollow_all_podcasts.applescript` 与用户上传的成功运行文件逐字节一致，未为公开发布重写其操作逻辑。
+**The script starts immediately and runs for up to 500 iterations. It also confirms library removal prompts, which can delete downloaded episodes. Back up anything you want to keep before running it.**
 
+## Setup
 
-## 运行前必须知道
+1. Download and unzip the repository.
+2. Open Podcasts and go to **Library > Shows**, with followed shows in the grid. Keep the main window visible and close any dialogs.
+3. Use the English app interface. The script looks for the labels `Shows` and `Unfollow`.
+4. Give Terminal or Script Editor the required accessibility and automation permissions in **System Settings > Privacy & Security**. See [Apple's accessibility guide](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac).
 
-**运行命令会直接开始真实操作，没有启动确认，默认最多循环 500 次。脚本还会自动确认移除资料库内容，可能删除下载的单集。** 这一行为保留自实际使用的快速版，阅读下文后再自行决定是否运行。
+No extra software is needed.
 
-- 脚本在取消关注后，会检查 Podcasts 的确认弹窗，并点击名称包含 `Remove` 的按钮。它不是“仅取消关注并保证保留下载”的工具，也没有预览模式。
-- 先记录想保留的节目名称或链接，并妥善备份需要保留的下载内容。本项目没有一键撤销或恢复功能；资料库变化可能同步到其他设备。
-- 取消关注不等于取消付费订阅。[Apple 官方说明](https://support.apple.com/en-mt/guide/podcasts/podf17151dc/mac)也区分取消关注和下载内容的处理。
-- 脚本依赖特定英文辅助功能标签及界面结构。用户成功使用的事实不代表所有 macOS、Podcasts 版本和语言都兼容。
+## Run
 
-## 已有的加速逻辑
-
-- 缓存节目网格及顶层分组引用，避免每轮都从整个窗口重新搜索。
-- 优先在浅层查找菜单，只有必要时才回退到深层搜索。
-- 按界面状态短间隔重试，尽快进入下一轮。
-- 上传文件中已经没有耗时的全窗口 `Remove From Library` 按钮兜底搜索；弹窗里的移除确认逻辑仍然保留。
-
-这些机制可以从代码确认。项目没有公布可复现的速度基准，也不承诺固定的加速倍数。
-
-## 下载与准备
-
-1. 在仓库选择 **Code → Download ZIP** 并解压，或使用 Git 克隆。无需安装 Python、Node 或其他运行依赖。
-2. 阅读脚本及风险说明。打开 Apple Podcasts，进入 **Library → Shows** 的已关注节目网格，关闭其他弹窗，保持主窗口可见。脚本不会替你导航到该页面。
-3. 代码精确匹配英文 `Shows` 和 `Unfollow`。其他界面语言没有适配；如需更改，可在 macOS 支持的“语言与地区 → 应用程序”设置中单独将 Podcasts 设为 English，再重新打开应用。
-4. 为实际运行宿主（例如“终端”或“脚本编辑器”）授予必要的辅助功能权限；系统提示时，按需要允许其自动化控制 System Events / Podcasts。参见 [Apple 辅助功能权限说明](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac)。设置名称可能随系统版本变化。
-
-## 使用
-
-在“终端”输入 `cd `（末尾一个空格），将解压后的项目文件夹拖入终端，然后按回车。确认自己接受自动取消关注及移除内容的行为后运行：
+Open Terminal in the project folder, then run:
 
 ```sh
 osascript ./unfollow_all_podcasts.applescript
 ```
 
-也可用“脚本编辑器”打开该文件并运行。**上述操作直接启动，最多循环 500 次。** 本脚本不读取终端中的批量数量参数；`osascript ... 10` 不会将上限设为 10。
+You can also open the file in Script Editor and click Run.
 
-如只想先处理少量节目，可自行编辑第 21 行，将 `set maxIterations to 500` 改成较小的正整数并保存。这样得到的是你自己的修改副本，不再与本仓库发布文件逐字节一致。
+To process fewer shows, change `set maxIterations to 500` near the top of the script to a smaller positive number. The script does not accept a batch-size argument.
 
-运行时看着 Podcasts，不要切换页面或操作其他窗口。可在启动命令的终端按 **Control-C**，或在脚本编辑器按停止按钮，中止后续操作。已经发生的取消关注或移除不会自动撤回。
+Watch Podcasts while it runs and avoid changing windows or views. Press **Control-C** in Terminal, or Stop in Script Editor, to stop further actions. Completed changes are not undone.
 
-## 结果与故障排查
+## Notes
 
-- 脚本结束时返回节目描述列表，并发送包含 `Unfollowed` 计数的通知。代码没有独立核验每次点击后的最终关注状态；请在 Podcasts 中确认结果。
-- **找不到 Shows / Unfollow**：检查英文界面、节目网格和关注状态。其他版本的菜单或界面层级可能不同，不要将取消关注项改成模糊的删除匹配。
-- **运行中停止或仍有节目**：检查弹窗、当前页面和账户同步状态；500 次是循环上限，不保证一次清空全部关注。
-- **权限错误**：检查实际启动脚本的宿主是否获准进行辅助功能控制和自动化。
-- **窗口/Space 问题**：手动将 Podcasts 主窗口切到当前桌面。源码里的 Dock 切换注释已经过时，实际只调用 `activate` 和设置前台状态。
+The project owner has successfully used this script. Other macOS versions and Podcasts layouts may behave differently.
 
-## 使用证据与兼容性
+- Unfollowing does not cancel paid subscriptions.
+- If it cannot find `Shows` or `Unfollow`, check the app language and current view.
+- Check your library afterward. The displayed count does not verify that every show was unfollowed.
 
-| 项目 | 当前记录 |
-| --- | --- |
-| 真实使用 | **用户明确确认：这份快速脚本已成功运行使用** |
-| 发布文件一致性 | 与上传文件和桌面运行文件的 SHA-256 完全相同 |
-| 语法检查 | 准备发布时已通过 AppleScript 编译 |
-| 发布整理过程 | 没有重新执行取消关注脚本，不影响上述已有成功使用记录 |
-| 具体成功环境 | 完整 macOS / Podcasts 版本及语言配置未单独记录；源码使用英文标签 |
-| 其他系统与界面 | 未建立跨版本兼容性矩阵；iPhone、iPad、Windows、网页端不能运行本 AppleScript |
-
-主脚本共 292 行、9,440 字节。SHA-256：
-
-```text
-d42c4321f64aeb62b6f23ea926ce3bf7b301e7039e171c226fdbb7d1c04963ea
-```
-
-## 许可与反馈
-
-采用 [MIT 许可证](LICENSE)。用户提供这份已实际使用的脚本，并授权公开分享。文件中没有第三方署名、既有许可证或上游链接；这些检查不构成对未知第三方权利的独立确认，详见 [来源与许可](docs/CODE_REVIEW.md#来源与许可)。项目与 Apple 无隶属关系。
-
-报告问题时请附 macOS / Podcasts 版本、界面语言和错误信息；不要公开账号信息或私人关注列表。
+[Code review](docs/CODE_REVIEW.md) · [Validation](docs/VALIDATION.md) · [MIT License](LICENSE)

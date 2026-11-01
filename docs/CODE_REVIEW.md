@@ -1,59 +1,33 @@
-# 快速版代码审查 / Fast script review
+# Code review
 
-审查日期：2026-10-30。已读完 `unfollow_all_podcasts.applescript` 全部 292 行。**用户确认这就是其已成功使用的快速版。** 当前主脚本与上传文件逐字节一致，没有另行改写。
+## How it works
 
-## 文件身份与使用证据
+The script uses System Events to read and control the Podcasts interface.
 
-- 文件名：`unfollow_all_podcasts.applescript`。
-- 大小：9,440 字节，292 行。
-- SHA-256：`d42c4321f64aeb62b6f23ea926ce3bf7b301e7039e171c226fdbb7d1c04963ea`。
-- 上传附件、桌面成功运行文件、仓库主脚本按哈希核对一致。
-- 用户已实际成功使用；发布整理时只做审查与编译，没有重新执行。二者是不同的证据，不应相互替代或否定。
-- 未发现私人绝对路径、账号凭证、网络地址、Shell 命令或第三方署名。
+- Finds the English `Shows` group and caches its parent references.
+- Reads the first show tile again on each iteration.
+- Opens the context menu, using a shallow search before a recursive fallback.
+- Presses the exact `Unfollow` menu item.
+- Looks for a sheet button containing `Remove` and presses it automatically.
+- Increments a counter and continues until the grid is empty, an error occurs, or 500 iterations have run.
 
-## 完整执行流程
+Short retries and cached references reduce repeated searches. The unused `findButtonContainingName` helper is still present; its expensive full-window removal fallback is not called.
 
-以下行号对应当前发布的快速脚本。
+## Limits and side effects
 
-| 行号 | 实际行为与注意事项 |
-| --- | --- |
-| 1–19 | 头注记载历史 macOS 26 / Darwin 25.5.0 环境。不能据此推定用户成功运行时的具体环境。Dock 切换 Space 的文字与实际实现不一致；为保持文件身份，注释也未修改。 |
-| 21–23 | 默认最多循环 500 次，没有启动确认或预览。维护计数和节目描述列表。 |
-| 25–101 | 三个递归辅助功能搜索函数；深度有限，但没有总节点或总耗时上限，部分异常被忽略。`findButtonContainingName` 在当前调用流程中未被使用。 |
-| 104–117 | 要求 Podcasts 已运行，调用 `activate`、设置前台状态并访问第一个窗口。实际没有点击 Dock，也不自动导航到节目页。 |
-| 119–135 | 精确查找英文 `Shows` 分组，缓存节目网格及顶层分组。缓存和后续浅层查找是已有加速机制。 |
-| 137–184 | 每轮重新取网格里的第一个直接 `AXButton`，必要时短间隔重试，避免一开始缓存全部节目。空网格不构成整个账户已清空的独立证明。 |
-| 186–238 | 读取节目描述，重试打开菜单；优先浅层查找 `AXMenu`，必要时深层搜索；仅匹配精确英文菜单项 `Unfollow`。 |
-| 240 | 实际按下取消关注项，会改变资料库。 |
-| 242–276 | 检查确认弹窗，自动按下名称包含 `Remove` 的首个按钮；**可能移除资料库及下载内容**。耗时的全窗口 `Remove From Library` 兜底搜索已经没有，弹窗移除逻辑仍在。 |
-| 278–279 | 累加计数并记录描述，没有独立验证每次取消关注最终成功。 |
-| 280–292 | 出错时发送全局 Escape、显示停止提示；结束时发送通知并返回描述列表。没有自动撤销，界面焦点变化可能影响 Escape 的目标。 |
+Library removal can delete downloaded episodes. There is no backup or rollback. Library changes may sync to other devices.
 
-## 发布时保留的行为
+The code assumes a specific English accessibility hierarchy. Recursive searches have depth limits but no overall time or node limit. Some accessibility errors are ignored.
 
-为满足“分享实际使用成功的快速版”，当前入口不再替换成另一套逻辑。500 次循环上限、自动移除确认、已有缓存和轮询方式均按上传文件保留，说明中直接披露相关影响。
+The counter records completed code paths, not independently verified changes to following state. On error, the script sends Escape to the current focused surface. Keep Podcasts visible and avoid interacting with other apps.
 
-此前额外编写的单次默认、启动确认、弹窗停止等保护逻辑不属于这份成功使用的文件，已从当前发布内容移除。不能把该改写稿的测试状态套用到当前脚本。
+The source comments mention clicking the Dock to switch Spaces, but the code only calls `activate` and sets Podcasts frontmost. Move its window to the current desktop manually if needed.
 
-## 兼容性边界
+## Source and license
 
-- 桌面 macOS Apple Podcasts + System Events 辅助功能脚本，依赖具体 UI 层级，非通用批量 API。
-- 代码精确匹配英文 `Shows` 和 `Unfollow`，没有中文等其他语言标签适配。
-- 用户成功使用记录有效；完整运行环境没有单独记录，不扩大为所有版本都已测试。
-- 已关注节目网格、窗口状态、同步延迟、不同语言、弹窗层级和应用更新都会影响结果。
-- 源码不含额外运行包安装、网络请求或直接数据库操作。Apple Podcasts 自身仍可能正常联网及同步。
-- 取消关注与下载内容移除、付费订阅取消是不同的操作；这个脚本不会办理付费订阅取消，也不保证保留下载。
+The project owner supplied the working script and authorized public sharing. The file has no third-party attribution, prior license notice, or upstream URL. The MIT license covers the rights the contributor can grant; unknown upstream rights have not been independently established.
 
-## 来源与许可
+## References
 
-用户提供这份已实际使用的脚本，并明确授权在其 GitHub 账号公开分享。文件未列第三方作者、既有许可证或上游链接；未发现相冲突声明，但这些事实不等于独立排除未知第三方权利。
-
-项目采用 MIT 许可，覆盖贡献者有权许可的代码及文档；不包含 Apple 应用或商标的许可。如日后发现上游来源，应核对和保留适用声明。
-
-## 参考
-
-- [Apple：在 Mac 上关注或取消关注节目](https://support.apple.com/en-mt/guide/podcasts/podf17151dc/mac)：关注、付费订阅及下载选择。
-- [Apple：辅助功能控制权限](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac)。
-- [Apple：使用 System Events 自动化用户界面](https://developer.apple.com/library/archive/documentation/LanguagesUtilities/Conceptual/MacAutomationScriptingGuide/AutomatetheUserInterface.html)。
-
-官方文档解释功能及权限；具体脚本的成功使用证据来自用户反馈，编译证据来自发布整理记录。
+- [Follow or unfollow shows in Podcasts on Mac](https://support.apple.com/en-mt/guide/podcasts/podf17151dc/mac)
+- [Apple's guide to UI scripting](https://developer.apple.com/library/archive/documentation/LanguagesUtilities/Conceptual/MacAutomationScriptingGuide/AutomatetheUserInterface.html)
